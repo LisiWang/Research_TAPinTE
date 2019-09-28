@@ -1,0 +1,850 @@
+---
+title: "TAP in TE"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r load-packages, include=FALSE}
+#install.packages("dplyr")
+#install.packages("car")
+#install.packages("effsize")
+#install.packages("agricolae")
+#install.packages("multcomp")
+#install.packages("ggplot2")
+#install.packages("jtools")
+#install.packages("ggpubr")
+#install.packages("numform")
+
+library(dplyr)
+library(car)
+library(effsize)
+library(agricolae)
+library(multcomp)
+library(ggplot2)
+library(jtools)
+library(ggpubr)
+library(numform)
+
+tap1 <- read.csv("TAPinTE_Exp1_Data.csv")
+tap2 <- read.csv("TAPinTE_Exp2_Data.csv")
+tap3 <- read.csv("TAPinTE_Exp3_Data.csv")
+tap4 <- read.csv("TAPinTE_Exp4_Data.csv")
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##TAP1
+###TAP1 P2 performance: IS vs. R
+* R > IS
+```{r}
+tap1_test <- tap1[tap1$Activity == "Test",]
+
+tap1_test %>%
+    group_by(P2) %>%
+    summarise(M = mean(P2AC),
+              SE = sd(P2AC)/sqrt(length(P2AC)))
+
+## t test assumptions - did not check normal distribution
+## t test assumptions - Levene's test - check equal variance 
+leveneTest(P2AC ~ P2, data = tap1_test)
+## levens test turned out to be sig, but we assume equal variance anyway
+
+## t test
+t_tap1_P2AC <- t.test(P2AC ~ P2, data = tap1_test, var.equal = T)
+t_tap1_P2AC
+
+## SED
+round((0.8952991-0.9612573)/t_tap1_P2AC$statistic, digits = 3)
+
+## effect size
+tap1_IStest <- tap1_test$P2AC[tap1_test$P2 == "IS"]
+tap1_Rtest <- tap1_test$P2AC[tap1_test$P2 == "R"]
+cohen.d(tap1_IStest,tap1_Rtest)
+```
+
+###TAP1 P3 performance (all): test vs. study; P2IS vs. P2R; P3IS vs. P3R
+```{r}
+## main effect of activity descriptives
+#tap1 %>%
+    #group_by(Activity) %>%
+    #summarise(M = mean(P3AC),
+              #SE = sd(P3AC)/sqrt(length(P3AC)))
+
+## main effect of P2 descriptives
+#tap1 %>%
+    #group_by(P2) %>%
+    #summarise(M = mean(P3AC),
+              #SE = sd(P3AC)/sqrt(length(P3AC)))
+
+## main effect of P3 descriptives
+#tap1 %>%
+    #group_by(P3) %>%
+    #summarise(M = mean(P3AC),
+              #SE = sd(P3AC)/sqrt(length(P3AC)))
+
+## anova descriptives 
+mean_se_exp1 <- tap1 %>%
+    group_by(Activity, P2, P3) %>%
+    summarise(M = mean(P3AC),
+              SE = sd(P3AC)/sqrt(length(P3AC)),
+              length(P3AC))
+mean_se_exp1
+
+mean_se1 <- tap1 %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC),
+              SE = sd(P3AC)/sqrt(length(P3AC)))
+mean_se1
+
+## anova - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap1Uncon_lm <- lm(P3AC ~ Activity + P2 + P3 + Activity:P2 + Activity:P3 + P2:P3 + Activity:P2:P3, data=tap1)
+tap1Uncon_anova <- Anova(tap1Uncon_lm, type = "III")
+tap1Uncon_anova
+
+## MSE
+tap1Uncon_anova$`Sum Sq`[9]/147
+
+## effect sizes
+tap1Uncon_SST <- 0.199 + 0.386 + 0.750 + 0.001 + 0.093 + 0.000 + 0.004 + 6.649
+## activity
+0.199/tap1Uncon_SST
+## P2
+0.386/tap1Uncon_SST
+## P3
+0.750/tap1Uncon_SST
+## Activity:P2
+0.001/tap1Uncon_SST
+## Activity:P3
+0.093/tap1Uncon_SST
+## P2:P3
+0.000/tap1Uncon_SST
+## Activity:P2:P3
+0.004/tap1Uncon_SST
+
+## this is the planned comparison (conceptual replication of the negative testing effect)
+with(subset(tap1, P2 == "R" & P3 == "R"), t.test(P3AC ~ Activity, var.equal = T))
+
+## relational final test
+#tap1_RP3 <- tap1[tap1$P3 == "R",]
+#options(contrasts = c("contr.sum", "contr.poly"))
+#tap1Uncon_RP3_anova <- lm(P3AC ~ Activity + P2 + Activity:P2, data=tap1_RP3)
+#Anova(tap1Uncon_RP3_anova, type = "III")
+
+## item-specific final test
+#tap1_ISP3 <- tap1[tap1$P3 == "IS",]
+#options(contrasts = c("contr.sum", "contr.poly"))
+#tap1Uncon_ISP3_anova <- lm(P3AC ~ Activity + P2 + Activity:P2, data=tap1_ISP3)
+#Anova(tap1Uncon_ISP3_anova, type = "III")
+```
+
+###TAP1 ARC: test vs. study; P2IS vs. P2R
+```{r}
+tap1_ARC <- tap1[tap1$P3 == "R",]
+
+## anova descriptives 
+mean_se_arc <- tap1_ARC %>%
+    group_by(Activity, P2) %>%
+    summarise(M = mean(ARC),
+              SE = sd(ARC)/sqrt(length(ARC)))
+mean_se_arc
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap1ARC_lm <- lm(ARC ~ Activity + P2 + Activity:P2, data=tap1_ARC)
+tap1ARC_anova <- Anova(tap1ARC_lm, type = "III")
+tap1ARC_anova
+
+## MSE
+tap1ARC_anova$`Sum Sq`[5]/74
+
+## effect sizes
+tap1ARC_SST <- 0.067 + 1.663 + 0.049 + 8.979
+## Activity
+0.067/tap1ARC_SST
+## P2
+1.663/tap1ARC_SST
+## Activity:P2
+0.049/tap1ARC_SST
+
+## this is the planned comparison (conceptual replication of the negative testing effect)
+with(subset(tap1_ARC, P2 == "R" & P3 == "R"), t.test(ARC ~ Activity, var.equal = T))
+```
+
+##TAP1 test only
+###TAP1 P3 performance (all): P2 IS vs. P2 R; P3 IS vs. P3 R
+* Sig main effect of P2  
+    + R P2 > IS P2  
+* Sig main effect of P3  
+    + IS P3 > R P3
+* Non sig interaction between P2 and P3  
+```{r}
+## anova descriptives 
+mean_se1 <- tap1_test %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC),
+              SE = sd(P3AC)/sqrt(length(P3AC)))
+mean_se1
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap1Uncon_test_lm <- lm(P3AC ~ P2 + P3 + P2:P3, data=tap1_test)
+tap1Uncon_test_anova <- Anova(tap1Uncon_test_lm, type = "III")
+tap1Uncon_test_anova
+
+## MSE
+tap1Uncon_test_anova$`Sum Sq`[5]/73
+
+## effect sizes
+tap1Uncon_test_SST <- 0.212 + 0.682 + 0.002 + 2.749
+## P2
+0.212/tap1Uncon_test_SST
+## P3
+0.682/tap1Uncon_test_SST
+## P2:p3
+0.002/tap1Uncon_test_SST
+
+## relational final test
+#with(subset(tap1_test,P3=="R"),t.test(P3AC~P2,var.equal=T))
+#with(subset(tap1_test,P3=="R"),cohen.d(P3AC~P2))
+
+## item-specific final test
+#with(subset(tap1_test,P3=="IS"),t.test(P3AC~P2, var.equal=T))
+#with(subset(tap1_test,P3=="IS"),cohen.d(P3AC~P2))
+```
+
+###TAP1 P3 performance (conditional): P2IS vs. P2R; P3IS vs. P3R
+* Sig main effect of P2  
+    + R P2 > IS P2  
+* Sig main effect of P3  
+    + IS P3 > R P3
+* Non sig interaction between P2 and P3  
+```{r}
+## anova descriptives 
+mean_se1_con <- tap1_test %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC_Con),
+              SE = sd(P3AC_Con)/sqrt(length(P3AC_Con)))
+mean_se1_con
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap1Con_lm <- lm(P3AC_Con ~ P2 + P3 + P2:P3, data=tap1_test)
+tap1Con_anova <- Anova(tap1Con_lm, type = "III")
+tap1Con_anova
+
+## MSE
+tap1Con_anova$`Sum Sq`[5]/73
+
+## effect sizes
+tap1Con_SST <- 0.176 + 0.821 + 0.005 + 2.614
+## P2
+0.176/tap1Con_SST
+## P3
+0.821/tap1Con_SST
+## P2:P3
+0.005/tap1Con_SST
+```
+
+##TAP2 
+###TAP2 P2 performance: IS vs. R
+* IS P2 > R P2  
+```{r}
+## t test descriptives
+tap2 %>%
+    group_by(P2) %>%
+    summarise(M = mean(P2AC),
+              SE = sd(P2AC)/sqrt(length(P2AC)))
+
+## t test assumptions - did not check normal distribution
+## t test assumptions - Levene's test
+leveneTest(P2AC ~ P2, data = tap2)
+## levens test turned out to be non-sig, we assume equal variance
+
+## actual t test
+t_tap2_P2AC <- t.test(P2AC ~ P2, data = tap2, var.equal = T)
+t_tap2_P2AC
+
+## SED
+round((0.8962963-0.6977513)/t_tap2_P2AC$statistic, digits = 3)
+
+## effect size
+tap2_IS <- tap2$P2AC[tap2$P2 == "IS"]
+tap2_R <- tap2$P2AC[tap2$P2 == "R"]
+cohen.d(tap2_IS,tap2_R)
+```
+
+###TAP2 P3 performance (all): P2 IS vs. P2 R; P3 IS vs. P3 R
+* Sig main effect of P2  
+    + R P2 > IS P2  
+* Marginally sig main effect of P3  
+    + IS P3 (marginally larger) = R P3
+* Sig interaction between P2 and P3  
+    + For R P3, R P2 > IS P2  
+    + For IS P3, IS P2 (numerically larger) = R P3  
+```{r}
+## anova descriptives 
+mean_se2 <- tap2 %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC),
+              SE = sd(P3AC)/sqrt(length(P3AC)))
+mean_se2
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap2Uncon_lm <- lm(P3AC ~ P2*P3, data=tap2)
+tap2Uncon_anova <- Anova(tap2Uncon_lm, type = "III")
+tap2Uncon_anova
+
+## MSE
+tap2Uncon_anova$`Sum Sq`[5]/83
+
+## effect sizes
+tap2Uncon_anova$`Sum Sq`
+tap2Uncon_SST <- 0.111626 + 0.091998 + 0.288732 + 2.027 ## SS Total
+0.111626/tap2Uncon_SST ## P2 effect size
+0.091998/tap2Uncon_SST ## P3 effect size
+0.288732/tap2Uncon_SST ## interaction effect size
+
+## Tukey HSD - see this webpage: 
+## https://stats.stackexchange.com/questions/31547/how-to-obtain-the-results-of-a-tukey-hsd-post-hoc-test-in-a-table-showing-groupe
+## http://www.sthda.com/english/wiki/two-way-anova-test-in-r#multiple-pairwise-comparison-between-the-means-of-groups
+#P2XP3 <- with(tap2, interaction(P2, P3))
+#tap2Uncon_lm2 <- lm(P3AC ~ P2XP3, data=tap2)
+#tap2Uncon_lm2_HSD <- HSD.test(tap2Uncon_lm2, "P2XP3", group=TRUE, main = "TAP 2 Uncon post hoc Tukey HSD")
+#tap2Uncon_lm2_HSD
+
+#tap2Uncon_lm2_Tukey <- glht(tap2Uncon_lm2, linfct = mcp(P2XP3 = "Tukey"))
+#summary(tap2Uncon_lm2_Tukey) #standard display
+#TAP2Uncon_tuk_cld <- cld(TAP2Uncon_tuk) #letter-based display
+#opar <- par(mai=c(1,1,1.5,1))
+#plot(TAP2Uncon_tuk_cld)
+#par(opar)
+
+## relational final test
+TAP2Uncon_RP3 <- with(subset(tap2,P3=="R"),t.test(P3AC~P2,var.equal=T))
+TAP2Uncon_RP3
+round((0.6157407-0.8029101)/TAP2Uncon_RP3$statistic, digits = 3)
+with(subset(tap2,P3=="R"),cohen.d(P3AC~P2))
+
+## item-specific final test
+TAP2Uncon_ISP3 <- with(subset(tap2,P3=="IS"),t.test(P3AC~P2, var.equal=T))
+TAP2Uncon_ISP3
+round((0.7962963-0.7526455)/TAP2Uncon_ISP3$statistic, digits = 3)
+with(subset(tap2,P3=="IS"),cohen.d(P3AC~P2))
+```
+
+###TAP2 P3 performance (conditional): P2 IS vs. P2 R; P3 IS vs. P3 R
+* Sig main effect of P2  
+    + R P2 > IS P2  
+* Marginally sig main effect of P3  
+    + IS P3 (marginally larger) = R P3
+* Sig interaction between P2 and P3  
+    + For R P3, R P2 > IS P2  
+    + For IS P3, IS P2 (numerically larger) = R P3  
+```{r}
+## anova descriptives 
+mean_se2_con<-tap2 %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC_Con),
+              SE = sd(P3AC_Con)/sqrt(length(P3AC_Con)))
+mean_se2_con
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap2Con_lm <- lm(P3AC_Con ~ P2 + P3 + P2:P3, data=tap2)
+tap2Con_anova <- Anova(tap2Con_lm, type = "III")
+tap2Con_anova
+
+## MSE
+tap2Con_anova$`Sum Sq`[5]/83
+
+## effect sizes
+tap2Con_anova$`Sum Sq`
+tap2Con_SST <- 0.15132 + 0.08276 + 0.36544 + 1.940 ## SS Total
+0.15132/tap2Con_SST ## P2 effect size
+0.08276/tap2Con_SST ## P3 effect size
+0.36544/tap2Con_SST ## interaction effect size
+
+## Tukey HSD
+#P2XP3 <- with(tap2, interaction(P2, P3))
+#tap2Con_lm2 <- lm(P3AC_Con ~ P2XP3, data=tap2)
+#tap2Con_lm2_HSD <- HSD.test(tap2Con_lm2, "P2XP3", group=TRUE, main = "TAP2 Con post hoc Tukey HSD")
+#tap2Con_lm2_HSD
+
+#TAP2Con_lm2_Tukey <- glht(tap2Con_lm2, linfct = mcp(P2XP3 = "Tukey"))
+#summary(TAP2Con_lm2_Tukey) ## standard display
+#TAP2Con_tuk_cld <- cld(TAP2Con_tuk) ## letter-based display
+#opar <- par(mai=c(1,1,1.5,1))
+#plot(TAP2Con_tuk_cld)
+#par(opar)
+
+## relational final test
+TAP2Con_RP3 <- with(subset(tap2,P3=="R"),t.test(P3AC_Con~P2,var.equal=T))
+TAP2Con_RP3
+round((0.6179939-0.8313835)/TAP2Con_RP3$statistic, digits = 3)
+with(subset(tap2,P3=="R"),cohen.d(P3AC_Con~P2))
+
+## item-specific final test
+TAP2Con_ISP3 <- with(subset(tap2,P3=="IS"),t.test(P3AC_Con~P2, var.equal=T))
+TAP2Con_ISP3
+round((0.8096223-0.7633331)/TAP2Con_ISP3$statistic, digits = 3)
+with(subset(tap2,P3=="IS"),cohen.d(P3AC_Con~P2))
+```
+
+##TAP3
+###TAP3 P2 performance: IS vs. R
+* R P2 > IS P2  
+```{r}
+## t test descriptives
+tap3 %>%
+    group_by(P2) %>%
+    summarise(M = mean(P2AC),
+              SE = sd(P2AC)/sqrt(length(P2AC)))
+
+## t test assumptions - did not check normal distribution
+## t test assumptions - Levene's test
+leveneTest(P2AC ~ P2, data = tap3)
+## levens test turned out to be non-sig, we assume equal variance
+
+## actual t test
+t_tap3_P2AC <- t.test(P2AC ~ P2, data = tap3, var.equal = T)
+t_tap3_P2AC
+
+## SED
+round((0.4285714-0.7080499)/t_tap3_P2AC$statistic, digits = 3)
+
+## effect size
+tap3_IS <- tap3$P2AC[tap3$P2 == "IS"]
+tap3_R <- tap3$P2AC[tap3$P2 == "R"]
+cohen.d(tap3_IS,tap3_R)
+```
+
+###TAP3 P3 performance (all): P2 IS vs. P2 R; P3 IS vs. P3 R
+* Sig main effect of P2
+    + R P2 > IS P2
+* Marginal non-sig main effect of P3  
+    + IS P3 (numerically larger) = R P3
+* Non-sig interaction between P2 and P3  
+```{r}
+## anova descriptives 
+mean_se3<-tap3 %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC),
+              SE = sd(P3AC)/sqrt(length(P3AC)))
+mean_se3
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap3Uncon_lm <- lm(P3AC ~ P2 + P3 + P2:P3, data=tap3)
+tap3Uncon_anova <- Anova(tap3Uncon_lm, type = "III")
+tap3Uncon_anova
+
+## MSE
+tap3Uncon_anova$`Sum Sq`[5]/94
+
+## effect sizes
+tap3Uncon_SST <- 0.959 + 0.118 + 0.000 + 4.002
+## P2
+0.959/tap3Uncon_SST
+## P3
+0.118/tap3Uncon_SST
+## P2:p3
+0.000/tap3Uncon_SST
+
+## relational final test
+#with(subset(tap3,P3=="R"),t.test(P3AC~P2,var.equal=T))
+#with(subset(tap3,P3=="R"),cohen.d(P3AC~P2))
+
+## item-specific final test
+#with(subset(tap3,P3=="IS"),t.test(P3AC~P2, var.equal=T))
+#with(subset(tap3,P3=="IS"),cohen.d(P3AC~P2))
+```
+
+###TAP3 conditional P3 performance: P2 IS vs. P2 R; P3 IS vs. P3 R
+* Sig main effect of P2
+    + R P2 > IS P2
+* Sig main effect of P3  
+    + IS P3 > R P3
+* Marginal non-sig interaction between P2 and P3 
+    + For R P3, R P2 > IS P2  
+    + For IS P3, R P2 (numerically larger) = IS P2  
+```{r}
+## anova descriptives
+mean_se3_con<-tap3 %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC_Con),
+              SE = sd(P3AC_Con)/sqrt(length(P3AC_Con)))
+mean_se3_con
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap3Con_lm <- lm(P3AC_Con ~ P2 + P3 + P2:P3, data=tap3)
+tap3Con_anova <- Anova(tap3Con_lm, type = "III")
+tap3Con_anova
+
+## MSE
+tap3Con_anova$`Sum Sq`[5]/94
+
+## effect sizes
+tap3Con_SST <- 0.189 + 0.373 + 0.106 + 2.608
+0.189/tap3Con_SST
+0.373/tap3Con_SST
+0.106/tap3Con_SST
+
+## relational final test
+with(subset(tap3,P3=="R"),t.test(P3AC_Con~P2,var.equal=T))
+with(subset(tap3,P3=="R"),cohen.d(P3AC_Con~P2))
+
+## item-specific final test
+with(subset(tap3,P3=="IS"),t.test(P3AC_Con~P2, var.equal=T))
+with(subset(tap3,P3=="IS"),cohen.d(P3AC_Con~P2))
+```
+
+##TAP4
+###TAP4 P2 performance: IS vs. R
+* R P2 (numerically larger) = IS P2  
+```{r}
+## t test descriptives - 2 conditions
+tap4 %>%
+    group_by(P2) %>%
+    summarise(M = mean(P2AC),
+              SE = sd(P2AC)/sqrt(length(P2AC)))
+
+## t test assumptions - did not check normal distribution
+## t test assumptions - Levene's test
+leveneTest(P2AC ~ P2, data = tap4)
+## levens test turned out to be non-sig, we assume equal variance
+
+## actual t test
+t_tap4_P2AC <- t.test(P2AC ~ P2, data = tap4, var.equal = T)
+t_tap4_P2AC
+
+## SED
+round((0.4622222-0.4895530)/t_tap4_P2AC$statistic, digits = 3)
+
+## effect size
+tap4_IS <- tap4$P2AC[tap4$P2 == "IS"]
+tap4_R <- tap4$P2AC[tap4$P2 == "R"]
+cohen.d(tap4_IS,tap4_R)
+```
+
+###TAP4 P3 performance (all): P2 IS vs. P2 R; P3 IS vs. P3 R
+* Non-sig main effect of P2  
+* Non-sig main effect of P3  
+* Sig interaction between P2 and P3  
+    + For R P3, R P2 > IS P2  
+    + For IS P3, IS P2 (numerically larger) = R P3  
+```{r}
+## anova descriptives - 4 conditions
+mean_se4<-tap4 %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC),
+              SE = sd(P3AC)/sqrt(length(P3AC)))
+mean_se4
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap4Uncon_lm <- lm(P3AC ~ P2 + P3 + P2:P3, data=tap4)
+tap4Uncon_anova <- Anova(tap4Uncon_lm, type = "III")
+tap4Uncon_anova
+
+## MSE
+tap4Uncon_anova$`Sum Sq`[5]/95
+
+## effect sizes
+tap4Uncon_SST <- 0.044 + 0.021 + 0.434 + 5.703
+## p2
+0.044/tap4Uncon_SST
+## p3
+0.021/tap4Uncon_SST
+## p2:p3
+0.434/tap4Uncon_SST
+
+## Tukey HSD
+#TAP4_P2XP3 <- with(tap4, interaction(P2, P3))
+#tap4Uncon_lm2 <- lm(P3AC ~ TAP4_P2XP3, data=tap4)
+#tap4Uncon_lm2_HSD <- HSD.test(tap4Uncon_lm2, "TAP4_P2XP3", group=TRUE, main = "test")
+#tap4Uncon_lm2_HSD
+
+#TAP4Uncon_lm2_Tukey <- glht(tap4Uncon_lm2, linfct = mcp(TAP4_P2XP3 = "Tukey"))
+#summary(TAP4Uncon_lm2_Tukey) ## standard display
+#TAP4Uncon_tuk_cld <- cld(TAP4Uncon_tuk) ## letter-based display
+#opar <- par(mai=c(1,1,1.5,1))
+#plot(TAP4Uncon_tuk_cld)
+#par(opar)
+
+## relational final test
+TAP4Uncon_RP3 <- with(subset(tap4,P3=="R"),t.test(P3AC~P2,var.equal=T))
+TAP4Uncon_RP3
+round((0.5349794-0.7099365)/TAP4Uncon_RP3$statistic, digits = 3)
+with(subset(tap4,P3=="R"),cohen.d(P3AC~P2))
+
+## item-specific final test
+TAP4Uncon_ISP3 <- with(subset(tap4,P3=="IS"),t.test(P3AC~P2, var.equal=T))
+TAP4Uncon_ISP3
+round((0.6968599-0.6064815)/TAP4Uncon_ISP3$statistic, digits = 3)
+with(subset(tap4,P3=="IS"),cohen.d(P3AC~P2))
+```
+
+###TAP4 P3 performance (conditional): P2 IS vs. P2 R times P3 IS vs. P3 R
+* Non-sig main effect of P2  
+* Non-sig main effect of P3  
+* Sig interaction between P2 and P3  
+    + For R P3, R P2 > IS P2  
+    + For IS P3, IS P2 > R P3  
+```{r}
+## anova descriptives - 4 conditions
+tap4_Con <- tap4[is.na(tap4$P3AC_Con) == FALSE, ]
+
+mean_se4_con<-tap4_Con %>%
+    group_by(P2, P3) %>%
+    summarise(M = mean(P3AC_Con),
+              SE = sd(P3AC_Con)/sqrt(length(P3AC_Con)))
+mean_se4_con
+
+## anova assumptions - did not check normal distribution or equal variance
+options(contrasts = c("contr.sum", "contr.poly"))
+tap4Con_lm <- lm(P3AC_Con ~ P2 + P3 + P2:P3, data=tap4)
+tap4Con_anova <- Anova(tap4Con_lm, type = "III")
+tap4Con_anova
+
+## MSE
+tap4Con_anova$`Sum Sq`[5]/94
+
+## effect sizes
+tap4Con_SST <- 0.041 + 0.000 + 0.878 + 3.647
+## p2
+0.041/tap4Con_SST
+## p3
+0.000/tap4Con_SST
+## p2:p3
+0.878/tap4Con_SST
+
+## Tukey HSD
+#TAP4_P2XP3 <- with(tap4, interaction(P2, P3))
+#tap4Con_lm2 <- lm(P3AC_Con ~ TAP4_P2XP3, data=tap4)
+#tap4Con_lm2_HSD <- HSD.test(tap4Con_lm2, "TAP4_P2XP3", group=TRUE, main = "test")
+#tap4Con_lm2_HSD
+
+#TAP4Con_lm2_Tukey <- glht(tap4Con_lm2, linfct = mcp(TAP4_P2XP3 = "Tukey"))
+#summary(TAP4Con_lm2_Tukey) ## standard display
+#TAP4Con_tuk_cld <- cld(TAP4Con_tuk) ## letter-based display
+#opar <- par(mai=c(1,1,1.5,1))
+#plot(TAP4Con_tuk_cld)
+#par(opar)
+
+## relational final test
+TAP4Con_RP3 <- with(subset(tap4,P3=="R"),t.test(P3AC_Con~P2,var.equal=T))
+TAP4Con_RP3
+round((0.6961652-0.8449912)/TAP4Con_RP3$statistic, digits = 3)
+with(subset(tap4,P3=="R"),cohen.d(P3AC_Con~P2))
+
+## item-specific final test
+TAP4Con_ISP3 <- with(subset(tap4,P3=="IS"),t.test(P3AC_Con~P2, var.equal=T))
+TAP4Con_ISP3
+round((0.8857489-0.6552107)/TAP4Con_ISP3$statistic, digits = 3)
+with(subset(tap4,P3=="IS"),cohen.d(P3AC_Con~P2))
+```
+
+##All graph
+```{R}
+allexps<-
+    data.frame(rbind(mean_se1,mean_se2,mean_se3,mean_se4,
+                     mean_se1_con,mean_se2_con,mean_se3_con,mean_se4_con),
+               Experiment=rep(c(rep("Experiment 1",4),rep("Experiment 2",4),
+                                rep("Experiment 3",4),rep("Experiment 4",4)),2),
+               Analysis=c(rep("All",16),rep("Conditional",16)))
+
+#head(allexps)
+
+## this corresponds to Figure 3
+allexps <- allexps %>%
+    mutate(newP2 = ifelse(P2 == "IS", "Randomized", "Categorized"),
+           newP3 = ifelse(P3 == "IS", "Randomized", "Categorized"),
+           processing = ifelse(P2 == "IS" & P3 == "IS", "IS-IS",
+                               ifelse(P2 == "IS" & P3 == "R", "IS-R",
+                                      ifelse(P2 == "R" & P3 == "IS", "R-IS", "R-R"))),
+           newM = numform::f_num(M, digits = 2),
+           newSE = paste0("(", numform::f_num(SE, digits = 2), ")"))
+#head(allexps)
+
+allexps$newP2 <- factor(allexps$newP2, levels = c("Randomized", "Categorized"))
+allexps$newP3 <- factor(allexps$newP3, levels = c("Randomized", "Categorized"))
+#head(allexps)
+
+## this is the new graph
+allexps[allexps$Analysis == "All",] %>%
+    ggplot(aes(x=newP3,y=M,fill=newP2))+
+    geom_bar(stat="identity",position="dodge")+
+    facet_wrap(~Experiment, ncol = 2)+ 
+    geom_errorbar(aes(ymin=M-SE,ymax=M+SE),width=0.2,position=position_dodge(0.9))+
+    labs(x="Final Test", y="\nProportion Recalled",
+         fill="Practice Test")+
+    scale_y_continuous(breaks = seq(0.00, 1.00, 0.10), limits = c(0.00, 1.00), 
+                       labels = numform::ff_num(zero = 0)) +
+    scale_fill_manual(values = c("#696969","#D3D3D3")) +
+    geom_text(aes(label=newM), vjust = -2.7, #1.5 + 1.2
+              color="black", size=4, 
+              position = position_dodge(0.9)) +
+    geom_text(aes(label=newSE), vjust = -1.5, #no space between dot is 1.5
+              color="black", size=4,
+              position = position_dodge(0.9)) +
+    geom_text(aes(label = processing, y = 0.04),
+              color = "black", size = 4,
+              position = position_dodge(0.9)) +
+    theme_apa()+
+    theme(panel.border = element_rect(),
+          axis.title=element_text(size = 12, face = "bold"),
+          axis.text=element_text(size = 12),
+          strip.text.x=element_text(size = 12),
+          legend.title=element_text(size = 12, face = "bold"), 
+          legend.text=element_text(size = 12),
+          legend.key.height = unit(0.25, "inches"),
+          legend.key.width = unit(0.25, "inches"),
+          legend.position = "bottom", 
+          legend.box.background = element_rect(), #default size is 0.5
+          axis.text.x = element_text(colour = ifelse(allexps$newP3=="Randomized","#585858","#B8B8B8")),
+          axis.text.y = element_text(color = "black"))
+#ggsave("*AllPlots_All_062019.pdf", width = 6.5, height = 7.4, dpi = 600)
+```
+
+##Conditional graph
+```{r}
+## this is the new graph
+AllPlots_Conditional <- allexps[allexps$Analysis == "Conditional",] %>%
+    ggplot(aes(x=newP3,y=M,fill=newP2))+
+    geom_bar(stat="identity",position="dodge")+
+    facet_wrap(~Experiment, ncol = 2)+ 
+    geom_errorbar(aes(ymin=M-SE,ymax=M+SE),width=0.2,position=position_dodge(0.9))+
+    labs(x="Final Test", y="Proportion Recalled\n(Conditional)",
+         fill="Practice Test")+
+    scale_y_continuous(breaks = seq(0.00, 1.00, 0.10), limits = c(0.00, 1.00),
+                       labels = numform::ff_num(zero = 0)) +
+    scale_fill_manual(values = c("#696969","#D3D3D3")) +
+    geom_text(aes(label=newM), vjust = -2.7, 
+              color="black", size=4, 
+              position = position_dodge(0.9)) +
+    geom_text(aes(label=newSE), vjust = -1.5, 
+              color="black", size=4,
+              position = position_dodge(0.9)) +
+    geom_text(aes(label = processing, y = 0.04),
+              color = "black", size = 4,
+              position = position_dodge(0.9)) +
+    theme_apa()+
+    theme(panel.border = element_rect(),
+          axis.title=element_text(size = 12, face = "bold"),
+          axis.text=element_text(size = 12),
+          strip.text.x=element_text(size = 12),
+          legend.title=element_text(size = 12, face = "bold"), 
+          legend.text=element_text(size = 12),
+          legend.key.height = unit(0.25, "inches"),
+          legend.key.width = unit(0.25, "inches"),
+          legend.position = "bottom", 
+          legend.box.background = element_rect(), #default size is 0.5
+          axis.text.x = element_text(colour = ifelse(allexps$newP3=="Randomized","#585858","#B8B8B8")),
+          axis.text.y = element_text(color = "black"))
+#ggsave("*AllPlots_Conditional_062019.pdf", width = 6.5, height = 7.4, dpi = 600)
+```
+
+##Exp 1 graph
+```{r}
+## this corresponds to Figure 2
+mean_se_exp1 <- mean_se_exp1 %>%
+    mutate(newM = numform::f_num(M, digits = 2),
+           newSE = paste0("(", numform::f_num(SE, digits = 2),")"),
+           newP2 = ifelse(P2 == "IS", "Randomized", "Categorized"),
+           newP3 = ifelse(P3 == "IS", "Randomized", "Categorized"),
+           processing = ifelse(P2 == "IS" & P3 == "IS", "IS-IS",
+                               ifelse(P2 == "IS" & P3 == "R", "IS-R",
+                                      ifelse(P2 == "R" & P3 == "IS", "R-IS", "R-R"))))
+#mean_se_exp1
+
+mean_se_exp1$newP2 <- factor(mean_se_exp1$newP2, levels = c("Randomized", "Categorized"))
+mean_se_exp1$newP3 <- factor(mean_se_exp1$newP3, levels = c("Randomized", "Categorized"))
+#mean_se_exp1
+
+## this is the new graph
+mean_se_exp1%>%
+    ggplot(aes(x=newP3,y=M,fill=newP2))+
+    geom_bar(stat="identity",position="dodge")+
+    facet_grid(~Activity)+
+    geom_errorbar(aes(ymin=M-SE,ymax=M+SE),width=0.2, position = position_dodge(0.9))+
+    labs(x="Final Test", y="\nProportion Recalled",
+         fill="Practice Task")+
+    scale_y_continuous(breaks = seq(0.00, 1.00, 0.10), limits = c(0.00, 1.00),
+                       labels = numform::ff_num(zero = 0)) +
+    scale_fill_manual(values = c("#696969","#D3D3D3")) +
+    geom_text(aes(label=newM), vjust = -2.9, 
+              color="black", size=4, 
+              position = position_dodge(0.9)) +
+    geom_text(aes(label=newSE), vjust = -1.7, 
+              color="black", size=4, 
+              position = position_dodge(0.9)) +
+    geom_text(aes(label = processing, y = 0.04),
+              color = "black", size = 4,
+              position = position_dodge(0.9)) +
+    theme_apa()+
+    theme(panel.border = element_rect(),
+          axis.title=element_text(size = 12, face = "bold"),
+          axis.text=element_text(size = 12),
+          strip.text.x=element_text(size = 12),
+          legend.title=element_text(size = 12, face = "bold"), 
+          legend.text=element_text(size = 12),
+          legend.key.height = unit(0.25, "inches"),
+          legend.key.width = unit(0.25, "inches"),
+          legend.position = "bottom", 
+          legend.box.background = element_rect(), #default size is 0.5
+          axis.text.x = element_text(color = ifelse(mean_se_exp1$newP3=="Randomized","#585858","#B8B8B8")),
+          axis.text.y = element_text(color = "black"))
+#ggsave("*Exp1Plots_062019.pdf", width = 6.5, height = 4.2, dpi = 600)
+```
+
+##Exp 1 ARC graph
+```{r}
+## this corresponds to Figure 4
+mean_se_arc <- mean_se_arc %>%
+    mutate(newM = numform::f_num(M, digits = 2),
+           newSE = paste0("(", numform::f_num(SE, digits = 2),")"),
+           newP2 = ifelse(P2 == "IS", "Randomized", "Categorized"),
+           processing = ifelse(P2 == "IS", "IS-R", "R-R"))
+#mean_se_arc
+
+mean_se_arc$newP2 <- factor(mean_se_arc$newP2, levels = c("Randomized", "Categorized"))
+#mean_se_arc
+
+## this is the new graph
+mean_se_arc%>%
+    ggplot(aes(x=newP2,y=M,fill=Activity))+
+    geom_bar(stat="identity",position="dodge")+
+    geom_errorbar(aes(ymin=M-SE,ymax=M+SE),width=0.2, position = position_dodge(0.9))+
+    labs(x = "Practice Task", y="\nARC Score", fill = "Activity")+
+    scale_y_continuous(breaks = seq(0.00, 1.00, 0.10), limits = c(0.00, 1.00),
+                       labels = numform::ff_num(zerp = 0)) +
+    scale_fill_manual(values = c("#696969","#D3D3D3")) +
+    geom_text(aes(label=newM), vjust = -3.7, 
+              color="black", size=4, 
+              position = position_dodge(0.9)) +
+    geom_text(aes(label=newSE), vjust = -2.5, 
+              color="black", size=4, 
+              position = position_dodge(0.9)) +
+    geom_text(aes(label = processing, y = 0.04),
+              color = "black", size = 4,
+              position = position_dodge(0.9)) +
+    theme_apa() +
+    theme(panel.border = element_rect(),
+          axis.title=element_text(size = 12, face = "bold"),
+          axis.text=element_text(size = 12),
+          strip.text.x=element_text(size = 12),
+          legend.title=element_text(size = 12, face = "bold"), 
+          legend.text=element_text(size = 12),
+          legend.key.height = unit(0.25, "inches"),
+          legend.key.width = unit(0.25, "inches"),
+          legend.position = "bottom", 
+          legend.box.background = element_rect(), #default size is 0.5
+          axis.text.x = element_text(color = "black"),
+          axis.text.y = element_text(color = "black"))
+#ggsave("*ARCPlots_062019.pdf", width = 3.65, height = 3.92, dpi = 600)
+```
+
